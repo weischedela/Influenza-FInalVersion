@@ -95,7 +95,7 @@ these simulations unless otherwise stated.
 seasonal and pandemic simulations as our research showed no notable
 differences between the two other than reproductive number.
 
-All differential equations come from class notes and assignments.
+All differential equations come from class notes and assignments (M. Ozanne, personal communication, April 2, 2024)
 
 ## Deterministic Simulation
 
@@ -190,7 +190,7 @@ pandemic_determ_plot = ggplot(data = pandemic_deterministic, aes(x=time)) + geom
 
 
 #ggarrange to put the graphs next to eachother + figure legend
-text_determ = paste("Figure 1. ", "Deterministic SEIR Models for Seasonal Influenza (A) and H1N1 Pandemic Influenza","\n","(B). Represents static outputs for the given parameters. Calculated using deterministic differencing equations.")
+text_determ = paste("Figure 1. ", "Deterministic SEIR Models for Seasonal Influenza (A) and H1N1 Pandemic Influenza","\n","(B). Represents static outputs for the given parameters. Calculated using deterministic differencing \nequations.")
 determ_arrange = ggarrange(seasonal_determ_plot + labs(title = ""), pandemic_determ_plot + labs(title =""), labels ="AUTO", ncol = 1)
 annotate_figure(determ_arrange, bottom = text_grob(text_determ, just="left",size = 10, hjust =0, x=unit(5.5,"pt"), family = "Helvetica"))
 
@@ -397,7 +397,7 @@ pandemic_stochastic_plot = ggplot(SEIR_pandemic_sim_summary, aes(x=time)) +
 
 #ggarrange to put the graphs next to eachother + figure legend
 stoch_arrange = ggarrange(seasonal_stochastic_plot, pandemic_stochastic_plot, labels = "AUTO", ncol = 1)
-text_stoch = paste("Figure 2. Stochastic SEIR models for Seasonal influenza (A) and H1N1 pandemic influenza (B).", "\n", "Stochastic plots represent average compartmental count of 100 model iterations with a 90% Monte Carlo", "\n", "confidence interval ribbon. Calculated using stochastic differencing equations.")
+text_stoch = paste("Figure 2. Stochastic SEIR models for Seasonal influenza (A) and H1N1 pandemic influenza (B).", "\n", "Stochastic plots represent average compartmental count of 100 model iterations with a 90% Monte \nCarlo confidence interval ribbon. Calculated using stochastic differencing equations.")
 annotate_figure(stoch_arrange, bottom = text_grob(text_stoch, just="left",size = 10, hjust =0, x=unit(5.5,"pt"), family = "Helvetica") )
 ```
 
@@ -520,7 +520,7 @@ SEIR_plot_D7 = SEIR_sim_pandemic_infectiousPeriod_variability(D=7) + labs(color 
 
 #ggarrange to put the graphs next to eachother + figure legend
 variable_arrange = ggarrange(SEIR_plot_D5,SEIR_plot_D6, SEIR_plot_D7, labels = "AUTO", vjust =1, ncol = 1)
-text_variable = paste("Figure 3. Stochastic SEIR models for Pandemic Influenza with different parameters for Infectious Period (D):\n 5 days(A), 6 days (B), and 7 days(C).  Stochastic plots represent average compartmental count of \n100 model iterations with a 90% Monte Carlo confidence interval ribbon. Calculated using stochastic \ndifferencing equations.")
+text_variable = paste("Figure 3. Stochastic SEIR models for Pandemic Influenza with different parameters for Infectious Period\n (D): 5 days(A), 6 days (B), and 7 days(C).  Stochastic plots represent average compartmental count of \n100 model iterations with a 90% Monte Carlo confidence interval ribbon. Calculated using stochastic \ndifferencing equations.")
 annotate_figure(variable_arrange, bottom = text_grob(text_variable, just="left",size = 10, hjust =0, x=unit(5.5,"pt"), family = "Helvetica") )
 ```
 
@@ -716,7 +716,7 @@ model were subsequently overestimated.
 
 ```{r}
 #arrange graphs together + figure legend
-text = paste("Figure 5. Summary of the deterministic SEIR models and stochastic SEIR models created for seasonal and H1N1 \npandemic influenza (A = Seasonal Deterministic, B = Pandemic Deterministic, C = Seasonal Stochastic, D= Pandemic \nStochastic). Both models show the average course of a hypothetical influenza outbreak in seasonal and pandemic \nconditions. Deterministic plots represent static outputs for the given parameters. Stochastic plots represent average \ncompartmental count of 100 model iterations with a 90% Monte Carlo confidence interval ribbon.")
+text = paste("Figure 5. Summary of the deterministic SEIR models and stochastic SEIR models created for seasonal and H1N1 \npandemic influenza (A = Seasonal Deterministic, B = Pandemic Deterministic, C = Seasonal Stochastic,\nD= Pandemic Stochastic). Both models show the average course of a hypothetical influenza outbreak in \nseasonal and pandemic conditions. Deterministic plots represent static outputs for the given parameters. Stochastic plots \nrepresent average compartmental count of 100 model iterations with a 90% Monte Carlo confidence \ninterval ribbon.")
 
 legend = get_legend(seasonal_stochastic_plot)
 
