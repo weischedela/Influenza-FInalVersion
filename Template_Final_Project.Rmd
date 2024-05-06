@@ -1,0 +1,818 @@
+---
+title: "Comparative Modeling of H1N1 Pandemic Influenza (2009-2010) and Seasonal Influenza Outbreaks in Connecticut Population"
+subtitle: "STAT 244NF: Infectious Disease Modeling"
+author: "Aoife Weischedel and Hailey Simons"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: pdf_document
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+library(ggplot2)
+library(ggpubr)
+library(str2str)
+
+#Definition of lambda_t function.
+lambda_t_fcn <- function(RN, D, I_i, N){
+  c_e <- RN/D
+ return(1-exp(-c_e*I_i/N))
+}
+
+#colors for graphing
+colors =  c("Susceptible" = "darkblue", "Exposed" = "darkgoldenrod2", "Infected"= "red", "Removed"="darkgreen")
+
+```
+
+# Introduction
+
+Influenza, more commonly known as the flu, is a viral disease caused by
+RNA viruses in the Orthomyxovirdae family, which are known for their
+high mutation rates (Taubenberger & Morens, 2008). In 2009, there was an
+international pandemic outbreak of a particular Influenza A H1N1 strain
+that became known as the swine flu. In this project, we will be modeling
+both this pandemic and seasonal influenza in a population the size of
+Connecticut’s population of 3,574,097 in 2009, a number which we
+gathered from United States census data (U.S. Census Bureau, 2012). We
+chose to use Connecticut’s population for our simulations as we are both
+from Connecticut and the census data was readily available.
+
+Since the H1N1 pandemic strain was prominent in the 2009-2010 time frame
+we are observing, we will be modeling seasonal influenza within the
+Connecticut population from 2009 as if it was happening in a year
+without H1N1, to compare the patterns of infection between the two forms
+of influenza independently. Influenza, both seasonal and within the 2009
+pandemic, will be following a SEIR model, representing individuals
+passing into a final compartment of removal via recovery or death. We
+intended to create a model in which these disease outcomes were
+distinct, but we will discuss that later in our model's limitations. We
+are using this model instead of an SEIRS model due to our goal of only
+modeling a single season of influenza and the single pandemic outbreak
+of H1N1 in 2009. Since an influenza infection confers immunity to a
+particular strain of influenza for a similar amount of time as a
+vaccine, which has been found to have effectiveness greater than zero
+for at least six months in Influenza A(H1N1) and Influenza B and for at
+least five months in Influenza A(H3N3), we feel fairly comfortable
+removing individuals from this simulation following their entrance into
+the recovery compartment (Ferdinands et al., 2017, Petrie et al., 2016).
+
+We are starting our simulation at a point where we are observing the
+spread of influenza both the seasonal and H1N1 outbreaks in Connecticut.
+Since influenza tends to be present in a population prior to the
+inceptions of seasonal and pandemic influenza in a season, we used 1000
+infected individuals as the original infected compartment for our
+visualizations. We used various parameters to characterize the outbreak,
+including reproductive number (the average number of individuals an
+infected person will infect), incubation period (the time, in days, from
+when a person is infected until they become infectious), and infectious
+period (the time, in days, a person is able to infect susceptible
+individuals).
+
+# Simulations
+
+## Assumptions
+
+Before we begin simulating different influenza outbreaks, it is
+important to state the assumptions we made when creating our models.
+
+1\. Total Population = Susceptible + Exposed + Infected + Removed.
+
+2\. The total population remains a constant size throughout the
+simulation.
+
+3\. The removed compartment includes both individuals who recover from
+the disease and those who die from the infection.
+
+4\. Individuals who recover from the flu will not become reinfected.
+
+5\. The initial infected population is assumed to be 1000 people in
+these simulations unless otherwise stated.
+
+6\. All parameters except for reproductive number are the same in
+seasonal and pandemic simulations as our research showed no notable
+differences between the two other than reproductive number.
+
+All differential equations come from class notes and assignments (M. Ozanne, personal communication, April 2, 2024)
+
+## Deterministic Simulation
+
+```{r}
+SEIR_simulation_deterministic = function(N,S0,E0,I0, RN, pD, D, Time){
+  #Create empty data frame to store results
+    SEIR_df <- data.frame(time=0:Time,
+                     S=rep(NA, Time+1),
+                     E=rep(NA, Time+1),
+                     I=rep(NA, Time+1),
+                     R=rep(NA, Time+1))
+  lambda_t=rep(NA, Time+1) 
+
+  #insert starting data for time =0
+  SEIR_df$S[1] <- S0
+  SEIR_df$E[1] = E0
+  SEIR_df$I[1] <- I0
+  SEIR_df$R[1] = N -S0-E0-I0
+  
+  pi = 1 - exp(-1/pD)
+  rho <- 1-exp(-1/D)
+
+  for (t in 2:(Time+1)){
+    lambda_t[t] = lambda_t_fcn(RN=RN, D=D, I_i=SEIR_df$I[t-1], N=N)
+    
+    SEIR_df$S[t] = SEIR_df$S[t-1] - (lambda_t[t]*SEIR_df$S[t-1])
+    SEIR_df$E[t] = SEIR_df$E[t-1] + (lambda_t[t]*SEIR_df$S[t-1]) - (pi*SEIR_df$E[t-1])
+    SEIR_df$I[t] = SEIR_df$I[t-1] + (pi*SEIR_df$E[t-1]) - (rho*SEIR_df$I[t-1])
+    SEIR_df$R[t] = SEIR_df$R[t-1] + (rho*SEIR_df$I[t-1])
+
+    
+  }
+  
+  return (SEIR_df)
+}
+```
+
+For this portion we chose to model both seasonal and pandemic influenza
+using a deterministic SEIR model. This helps us model the average
+disease outcome with fixed parameters and predetermined outcomes.
+
+**Equations:**
+
+$$S_t=S_{t-1}-\lambda_tS_{t-1}$$
+$$E_t=E_{t-1}+\lambda_tS_{t-1}-\pi E_{t-1}$$
+$$I_t=I_{t-1}+\pi E_{t-1}-\rho I_{t-1}$$ $$R_t=R_{t-1}+\rho I_{t-1}$$
+
+$\lambda_t=1-e^{-c_e\frac{I_{t-1}}{N}}$ = probability of an individual
+transitioning from the Susceptible compartment (S) to the Exposed
+compartment (E) at time point t.
+
+$\pi=1-e^{-\frac{1}{D'}}$ = probability of an individual transitioning
+from the Exposed compartment (E) to the Infected compartment (I).
+
+$\rho=1-e^{-\frac{1}{D}}$ = probability of an individual transitioning
+from the Infected compartment (I) to the Removed compartment (R).
+
+**Model Parameters:**
+
+Pre-infectious period (pD or $D'$) = the average
+incubation/pre-infectious period for both seasonal and H1N1 pandemic
+influenza is 2 days (World Health Organization, 2023).
+
+Infectious period ($D$) = the average infectious period for both
+seasonal and H1N1 pandemic influenza is 6 days (Centers for Disease
+Control and Prevention, 2024a).
+
+Reproductive Number (RN) = the average reproductive number for seasonal
+influenza is 1.28 and 1.46 for H1N1 pandemic influenza (Biggerstaff et
+al., 2014).
+
+Time = We are modeling for 365 days to simulate starting from April 2009
+as the Connecticut Department of Health considers that the beginning of
+the H1N1 Pandemic (Pandemic influenza, Connecticut, 2009-2010, 2010).
+
+Here we will be generating deterministic simulations following the
+parameters for both seasonal and pandemic influenza.
+
+```{r}
+#deterministic model for seasonal parameters
+seasonal_deterministic = SEIR_simulation_deterministic(N=3574097, S0=3573097,E0=0,I0=1000,RN=1.28, pD=2,D=6,Time=365)
+#deterministic model for pandemic parameters
+pandemic_deterministic = SEIR_simulation_deterministic(N=3574097, S0=3573097,E0=0,I0=1000,RN=1.46, pD=2,D=6,Time=365)
+
+#graph for seasonal model
+seasonal_determ_plot = ggplot(data = seasonal_deterministic, aes(x=time)) + geom_line(aes(y=S, col = "Susceptible")) + geom_line(aes(y=E, col= "Exposed")) + geom_line(aes(y=I, col = "Infected")) + geom_line(aes(y=R, col = "Removed")) + labs(title = "Seasonal Influenza Deterministic Model", x="Time (Days)", y = "Count", color = "Legend") + scale_color_manual(values = colors)
+
+#graph for pandemic model
+pandemic_determ_plot = ggplot(data = pandemic_deterministic, aes(x=time)) + geom_line(aes(y=S, col = "Susceptible")) + geom_line(aes(y=E, col = "Exposed")) + geom_line(aes(y=I, col = "Infected")) + geom_line(aes(y=R, col = "Removed")) + labs(title = "Pandemic Influenza Deterministic Model", x="Time (Days)", y = "Count", color = "Legend") + scale_color_manual(values = colors)
+
+
+
+
+#ggarrange to put the graphs next to eachother + figure legend
+text_determ = paste("Figure 1. ", "Deterministic SEIR Models for Seasonal Influenza (A) and H1N1 Pandemic Influenza","\n","(B). Represents static outputs for the given parameters. Calculated using deterministic differencing \nequations.")
+determ_arrange = ggarrange(seasonal_determ_plot + labs(title = ""), pandemic_determ_plot + labs(title =""), labels ="AUTO", ncol = 1)
+annotate_figure(determ_arrange, bottom = text_grob(text_determ, just="left",size = 10, hjust =0, x=unit(5.5,"pt"), family = "Helvetica"))
+
+
+
+
+```
+
+## Stochastic Simulations
+
+```{r}
+SEIR_simulation_stochastic = function(N,S0,E0,I0, RN, pD, D, Time){
+    SEIR_df <- data.frame(time=0:Time,
+                     S=rep(NA, Time+1),
+                     E=rep(NA, Time+1),
+                     I=rep(NA, Time+1),
+                     R=rep(NA, Time+1),
+                     lambda_t=rep(NA, Time+1),
+                      E_SE=rep(NA, Time+1),
+                      I_EI= rep(NA, Time+1),
+                      R_IR=rep(NA, Time+1))
+
+  SEIR_df$S[1] <- S0
+  SEIR_df$E[1] = E0
+  SEIR_df$I[1] <- I0
+  SEIR_df$R[1] = N -S0-E0-I0
+  
+  pi = 1 - exp(-1/pD)
+  rho <- 1-exp(-1/D)
+
+
+  for (t in 2:(Time+1)){
+      #Hailey, i dont hate it but why is the seed change here?
+      #set.seed(t+1)
+      SEIR_df$lambda_t[t] <- lambda_t_fcn(RN=RN, D=D, I_i=SEIR_df$I[t-1], N=N)
+      SEIR_df$E_SE[t] <- rbinom(n=1, size= SEIR_df$S[t-1], prob=SEIR_df$lambda_t[t])
+      SEIR_df$I_EI[t] <- rbinom(n=1, size= SEIR_df$E[t-1], prob=pi)
+      SEIR_df$R_IR[t] <- rbinom(n=1, size= SEIR_df$I[t-1], prob=rho)
+      
+      SEIR_df$S[t] <- SEIR_df$S[t-1]-SEIR_df$E_SE[t]
+      SEIR_df$E[t] <- SEIR_df$E[t-1]+SEIR_df$E_SE[t]-SEIR_df$I_EI[t]
+      SEIR_df$I[t] <- SEIR_df$I[t-1]+SEIR_df$I_EI[t]-SEIR_df$R_IR[t]
+      SEIR_df$R[t] <- SEIR_df$R[t-1]+SEIR_df$R_IR[t]
+  }
+  
+  return (SEIR_df)
+}
+```
+
+For this portion we chose to model both seasonal and pandemic influenza
+using a stochastic SEIR model. This helps us add an element of
+variability using random variables to get multiple possible outcomes for
+the disease. We ran these simulations 100 times for both seasonal and
+pandemic parameters to get a better picture of the possible ways this
+disease can spread
+
+**Equations:** $$S_t=S_{t-1}-E^{(SE)}_t$$
+
+$$E_t=E_{t-1}+E^{(SE)}_t-I^{(EI)}_t$$
+
+$$I_t=I_{t-1}+I^{(EI)}_t-R^{(IR)}_t$$
+
+$$R_t=R_{t-1}+R^{(IR)}_t$$
+
+E~t~^SE^ = Number of newly exposed individuals at time t. Random
+variable generated from binomial distribution: Binomial (S~t-1~,
+$\lambda\_t$).
+
+I~t~^EI^ = Number of newly infected individuals at time t. Random
+variable generated from binomial distribution: Binomial (E~t-1~, $\pi$).
+
+R~t~^IR^ = Number of newly Removed individuals at time t. Random
+variable generated from binomial distribution: Binomial (I~t-1~,
+$\rho$).
+
+**Model Parameters:**
+
+Pre-infectious period (pD or $D'$) = the average
+incubation/pre-infectious period for both seasonal and H1N1 pandemic
+influenza is 2 days (World Health Organization, 2023).
+
+Infectious period ($D$) = the average infectious period for both
+seasonal and H1N1 pandemic influenza is 6 days (Centers for Disease
+Control and Prevention, 2024a).
+
+Reproductive Number (RN) = the average reproductive number for seasonal
+influenza is 1.28 and 1.46 for H1N1 pandemic influenza (Biggerstaff et
+al., 2014).
+
+Time = We are modeling for 365 days to simulate starting from April 2009
+as the Connecticut Department of Health considers that the beginning of
+the H1N1 Pandemic (Pandemic influenza, Connecticut, 2009-2010, 2010).
+
+Here we will be generating stochastic simulations following the
+parameters for both seasonal and pandemic influenza.This helps us add an
+element of variability using random variables to get determine possible
+outcomes for the behavior of this disease. We ran these simulations 100
+times for both seasonal and pandemic parameters to get a better picture
+of the possible ways these forms of influenza could spread.
+
+```{r fig.align='center', echo=FALSE}
+#dimensions of sim storage matrix
+TotalSim=100
+Time =365
+Vars=9
+
+#100 iterations of stochastic modeling for seasonal parameters
+SEIR_seasonal_sim_array = array(data= NA, dim=c(Time+1, Vars, TotalSim), dimnames=list(NULL,
+c("time", "S", "E", "I", "R", "E_SE", "I_EI", "R_IR", "lambda_t"), NULL))
+
+for(i in 1:100){
+  set.seed(123*i)
+  SEIR_seasonal_sim_array[,,i]= as.matrix(SEIR_simulation_stochastic(N=3574097,S0=3573097,E0=0,I0=1000,RN=1.28, pD=2,D=6,Time= 365))
+ 
+}
+
+#100 iterations of stochastic modeling for pandemic parameters
+SEIR_pandemic_sim_array = array(data= NA, dim=c(Time+1, Vars, TotalSim), dimnames=list(NULL, c("time", "S", "E", "I", "R", "E_SE", "I_EI", "R_IR", "lambda_t"), NULL))
+
+
+for(i in 1:100){
+  set.seed(123*i)
+  SEIR_pandemic_sim_array[,,i] = as.matrix(SEIR_simulation_stochastic(N=3574097, S0=3573097,E0=0,I0=1000,RN=1.46, pD=2, D=6,Time=365))
+}
+
+#Monte Carlo Intervals for seasonal and pandemic influenza models
+
+SEIR_seasonal_sim_summary <- data.frame(time=0:Time,
+                                  S_lower=NA,
+                                  S_median=NA,
+                                  S_upper=NA,
+                                  E_lower=NA,
+                                  E_median=NA,
+                                  E_upper=NA,
+                                  I_lower=NA,
+                                  I_median=NA,
+                                  I_upper=NA,
+                                  R_lower=NA,
+                                  R_median=NA,
+                                  R_upper=NA)
+
+for (i in 1:(Time+1)){
+  ## Columns 2:4 (2,3,4) correspond to S.
+  SEIR_seasonal_sim_summary[i,2:4] <- quantile(SEIR_seasonal_sim_array[i,2,], probs=c(0.05, 0.5, 0.95))
+  ## Columns 5:7 (5,6,7) correspond to E.
+  SEIR_seasonal_sim_summary[i,5:7] <- quantile(SEIR_seasonal_sim_array[i,3,], probs=c(0.05, 0.5, 0.95))
+  ## Columns 8:10 (8,9,10) correspond to I.
+  SEIR_seasonal_sim_summary[i,8:10] <- quantile(SEIR_seasonal_sim_array[i,4,], probs=c(0.05, 0.5, 0.95))
+  ## Columns 11:13 (11,12,13) correspond to R.
+  SEIR_seasonal_sim_summary[i,11:13] <- quantile(SEIR_seasonal_sim_array[i,5,], probs=c(0.05, 0.5, 0.95))
+ 
+}
+
+SEIR_pandemic_sim_summary <- data.frame(time=0:Time,
+                                  S_lower=NA,
+                                  S_median=NA,
+                                  S_upper=NA,
+                                  E_lower=NA,
+                                  E_median=NA,
+                                  E_upper=NA,
+                                  I_lower=NA,
+                                  I_median=NA,
+                                  I_upper=NA,
+                                  R_lower=NA,
+                                  R_median=NA,
+                                  R_upper=NA)
+for (i in 1:(Time+1)){
+  ## Columns 2:4 (2,3,4) correspond to S.
+  SEIR_pandemic_sim_summary[i,2:4] <- quantile(SEIR_pandemic_sim_array[i,2,], probs=c(0.05, 0.5, 0.95))
+  ## Columns 5:7 (5,6,7) correspond to E.
+  SEIR_pandemic_sim_summary[i,5:7] <- quantile(SEIR_pandemic_sim_array[i,3,], probs=c(0.05, 0.5, 0.95))
+  ## Columns 8:10 (8,9,10) correspond to I.
+  SEIR_pandemic_sim_summary[i,8:10] <- quantile(SEIR_pandemic_sim_array[i,4,], probs=c(0.05, 0.5, 0.95))
+  ## Columns 11:13 (11,12,13) correspond to R.
+  SEIR_pandemic_sim_summary[i,11:13] <- quantile(SEIR_pandemic_sim_array[i,5,], probs=c(0.05, 0.5, 0.95))
+ 
+}
+
+#Plotting seasonal model data.
+seasonal_stochastic_plot = ggplot(SEIR_seasonal_sim_summary, aes(x=time)) + 
+  geom_line(aes(y=S_median, col = "Susceptible")) +  
+  geom_line(aes(y=E_median, col="Exposed")) +  
+  geom_line(aes(y=I_median, col="Infected")) +  
+  geom_line(aes(y=R_median, col="Removed"))+ 
+  geom_ribbon(aes(ymin=S_lower, ymax= S_upper), alpha=0.2, fill="darkblue") + 
+  geom_ribbon(aes(ymin=E_lower, ymax= E_upper), alpha=0.2, fill="darkgoldenrod2") +
+  geom_ribbon(aes(ymin=I_lower, ymax= I_upper), alpha=0.2, fill="red") + 
+  geom_ribbon(aes(ymin=R_lower, ymax= R_upper), alpha=0.2, fill="darkgreen") + 
+  labs(x="Time (Days)", y = "Count", color = "Legend") + scale_color_manual(values = colors) #+labs(title = "Seasonal Influenza Stochastic Model (90% confidence interval)")
+
+
+
+#Plotting pandemic model data.
+pandemic_stochastic_plot = ggplot(SEIR_pandemic_sim_summary, aes(x=time)) + 
+  geom_line(aes(y=S_median, col = "Susceptible")) +  
+  geom_line(aes(y=E_median, col="Exposed")) +  
+  geom_line(aes(y=I_median, col="Infected")) +  
+  geom_line(aes(y=R_median, col="Removed"))+ 
+  geom_ribbon(aes(ymin=S_lower, ymax= S_upper), alpha=0.2, fill="darkblue") + 
+  geom_ribbon(aes(ymin=E_lower, ymax= E_upper), alpha=0.2, fill="darkgoldenrod2") +
+  geom_ribbon(aes(ymin=I_lower, ymax= I_upper), alpha=0.2, fill="red") + 
+  geom_ribbon(aes(ymin=R_lower, ymax= R_upper), alpha=0.2, fill="darkgreen") + 
+  labs(x="Time (Days)", y = "Count", color = "Legend") + scale_color_manual(values = colors) #+labs(title = "Pandemic Influenza Stochastic Model (90% confidence interval)")
+
+#ggarrange to put the graphs next to eachother + figure legend
+stoch_arrange = ggarrange(seasonal_stochastic_plot, pandemic_stochastic_plot, labels = "AUTO", ncol = 1)
+text_stoch = paste("Figure 2. Stochastic SEIR models for Seasonal influenza (A) and H1N1 pandemic influenza (B).", "\n", "Stochastic plots represent average compartmental count of 100 model iterations with a 90% Monte \nCarlo confidence interval ribbon. Calculated using stochastic differencing equations.")
+annotate_figure(stoch_arrange, bottom = text_grob(text_stoch, just="left",size = 10, hjust =0, x=unit(5.5,"pt"), family = "Helvetica") )
+```
+
+## Stochastic Simulations Incorporating Ranges for Disease Dynamics
+
+```{r}
+SEIR_sim_pandemic_infectiousPeriod_variability = function(D){
+  #100 iterations of stochastic modeling for pandemic parameters
+SEIR_pandemic_sim_array = array(data= NA, dim=c(Time+1, Vars, TotalSim), dimnames=list(NULL, c("time", "S", "E", "I", "R", "E_SE", "I_EI", "R_IR", "lambda_t"), NULL))
+
+
+for(i in 1:100){
+  set.seed(123*i)
+  SEIR_pandemic_sim_array[,,i] = as.matrix(SEIR_simulation_stochastic(N=3574097, S0=3573097,E0=0,I0=1000,RN=1.46, pD=2, D=D,Time=365))
+}
+
+SEIR_pandemic_sim_summary <- data.frame(time=0:Time,
+                                  S_lower=NA,
+                                  S_median=NA,
+                                  S_upper=NA,
+                                  E_lower=NA,
+                                  E_median=NA,
+                                  E_upper=NA,
+                                  I_lower=NA,
+                                  I_median=NA,
+                                  I_upper=NA,
+                                  R_lower=NA,
+                                  R_median=NA,
+                                  R_upper=NA)
+for (i in 1:(Time+1)){
+  ## Columns 2:4 (2,3,4) correspond to S.
+  SEIR_pandemic_sim_summary[i,2:4] <- quantile(SEIR_pandemic_sim_array[i,2,], probs=c(0.05, 0.5, 0.95))
+  ## Columns 5:7 (5,6,7) correspond to E.
+  SEIR_pandemic_sim_summary[i,5:7] <- quantile(SEIR_pandemic_sim_array[i,3,], probs=c(0.05, 0.5, 0.95))
+  ## Columns 8:10 (8,9,10) correspond to I.
+  SEIR_pandemic_sim_summary[i,8:10] <- quantile(SEIR_pandemic_sim_array[i,4,], probs=c(0.05, 0.5, 0.95))
+  ## Columns 11:13 (11,12,13) correspond to R.
+  SEIR_pandemic_sim_summary[i,11:13] <- quantile(SEIR_pandemic_sim_array[i,5,], probs=c(0.05, 0.5, 0.95))
+ 
+}
+#Plotting pandemic model data.
+pandemic_stochastic_plot = ggplot(SEIR_pandemic_sim_summary, aes(x=time)) + 
+  geom_line(aes(y=S_median, col = "Susceptible")) +  
+  geom_line(aes(y=E_median, col="Exposed")) +  
+  geom_line(aes(y=I_median, col="Infected")) +  
+  geom_line(aes(y=R_median, col="Removed"))+ 
+  geom_ribbon(aes(ymin=S_lower, ymax= S_upper), alpha=0.2, fill="darkblue") + 
+  geom_ribbon(aes(ymin=E_lower, ymax= E_upper), alpha=0.2, fill="darkgoldenrod2") +
+  geom_ribbon(aes(ymin=I_lower, ymax= I_upper), alpha=0.2, fill="red") + 
+  geom_ribbon(aes(ymin=R_lower, ymax= R_upper), alpha=0.2, fill="darkgreen") + 
+  labs( x="Time (Days)", y = "Count", color = "Legend") + scale_color_manual(values = colors) ##+ ylim(0,500000)
+
+return (pandemic_stochastic_plot)
+}
+
+```
+
+For this portion we chose to examine the range of potential infectious
+periods to see how they effect the spread of seasonal influenza. We are
+choosing to only model the pandemic influenza strain to focus on the
+importance of the infectious period variability. We ran these
+simulations 100 times for both seasonal and pandemic parameters to get a
+better picture of the possible ways this disease can spread.
+
+**Equations:** $$S_t=S_{t-1}-E^{(SE)}_t$$
+
+$$E_t=E_{t-1}+E^{(SE)}_t-I^{(EI)}_t$$
+
+$$I_t=I_{t-1}+I^{(EI)}_t-R^{(IR)}_t$$
+
+$$R_t=R_{t-1}+R^{(IR)}_t$$
+
+E~t~^SE^ = Number of newly exposed individuals at time t. Random
+variable generated from binomial distribution: Binomial (S~t-1~,
+$\lambda\_t$).
+
+I~t~^EI^ = Number of newly infected individuals at time t. Random
+variable generated from binomial distribution: Binomial (E~t-1~, $\pi$).
+
+R~t~^IR^ = Number of newly Removed individuals at time t. Random
+variable generated from binomial distribution: Binomial (I~t-1~,
+$\rho$).
+
+**Model Parameters:**
+
+Pre-infectious period (pD) = the average incubation/pre-infectious
+period for both seasonal and H1N1 pandemic influenza is 2 days (World
+Health Organization, 2023).
+
+Infectious period (D) = the average infectious period for both seasonal
+and H1N1 pandemic influenza is 6 days, however this can range from 5-7
+days, with the potential to be even longer in children and people with
+weakened immune systems (Centers for Disease Control and Prevention,
+2024a).
+
+Reproductive Number (RN) = the average reproductive number for seasonal
+influenza is 1.28 and 1.46 for H1N1 pandemic influenza (Biggerstaff et
+al., 2014).
+
+Time = We are modeling for 365 days to simulate starting from April 2009
+as the Connecticut Department of Health considers that the beginning of
+the H1N1 Pandemic (Pandemic influenza, Connecticut, 2009-2010, 2010).
+
+Here we will be generating stochastic simulations following the
+parameters for pandemic influenza with differing infectious periods.This
+helps us add an element of variability using random variables to get
+determine possible outcomes for the behavior of this disease. We ran
+these simulations 100 times for pandemic parameters to get a better
+picture of the possible ways this form of influenza could spread.
+
+```{r fig.align='center', echo=FALSE}
+#D= 5 days
+SEIR_plot_D5 = SEIR_sim_pandemic_infectiousPeriod_variability(D=5) + labs(color = "") ##+ labs(title = "Pandemic Influenza Model (D=5 days)")
+
+#D= 6 days
+SEIR_plot_D6 = SEIR_sim_pandemic_infectiousPeriod_variability(D=6) + labs(color = "")  ##+ labs(title = "Pandemic Influenza Model (D=6 days)")
+
+#D = 7 days
+SEIR_plot_D7 = SEIR_sim_pandemic_infectiousPeriod_variability(D=7) + labs(color = "") ##+ labs(title = "Pandemic Influenza Model (D=7 days)")
+
+#ggarrange to put the graphs next to eachother + figure legend
+variable_arrange = ggarrange(SEIR_plot_D5,SEIR_plot_D6, SEIR_plot_D7, labels = "AUTO", vjust =1, ncol = 1)
+text_variable = paste("Figure 3. Stochastic SEIR models for Pandemic Influenza with different parameters for Infectious Period\n (D): 5 days(A), 6 days (B), and 7 days(C).  Stochastic plots represent average compartmental count of \n100 model iterations with a 90% Monte Carlo confidence interval ribbon. Calculated using stochastic \ndifferencing equations.")
+annotate_figure(variable_arrange, bottom = text_grob(text_variable, just="left",size = 10, hjust =0, x=unit(5.5,"pt"), family = "Helvetica") )
+```
+
+# Data Exploration
+
+This data comes from the Centers for Disease Control and Prevention
+(CDC) FluView Interactive Portal, which contains influenza infection
+data at the National, Census Division and Health and Human Services
+(HHS) Region levels (Centers for Disease Control and Prevention, 2024b).
+We chose to take data from the New England Census Divison for this
+project's data set as we could unfortunately not get information at the
+state level for this influenza season. Fortunately this infection data
+does resemble the patterns seen in other state-specific influenza
+information, such as the percentage of total Emergency Department visits
+attributed to H1N1 influenza.
+
+Another important thing to note is that this data set graphs the total
+number of Influenza A cases that were either not subtyped or unable to
+be subtyped in addition to 2009 H1N1. Neither category had a significant
+number of cases that would affect these results, but we used them
+additionally to attempt to capture a whole picture of the pandemic
+
+We are also using a subset of both the 2008-2009 and 2009-2010 flu
+seasons to get a more accurate view of how the disease spread over a
+year, especially as this pandemic season lasted much longer than normal
+(Pandemic influenza, Connecticut, 2009-2010, 2010).
+
+We ran an additional stochastic simulation using the pandemic influenza
+parameters. Our previous modeling strategy posed a challenge when
+comparing against real data, as the maximum number of infected
+individuals at one time point was 794, which is smaller than our
+previous starting number of 1000. The number of potential H1N1 influenza
+cases in Connecticut during the first week of April, 2009 was 8, so we
+chose to use 8 as our initial population in the Infected compartment of
+our model.
+
+```{r}
+NE_H1N1_pandemic_data = read.csv("CDC_FluView_NewEngland.csv")
+
+#REAL DATA PLOT
+CDC_influenza_plot = ggplot(data=NE_H1N1_pandemic_data, aes(x=Time, y=Total)) + geom_point(aes(col="Infected")) + geom_line(aes(col="Infected")) + labs( y = "# of Infections", x = "Time (Days)", color = "Legend") + scale_color_manual(values = colors) + ylim(0,1000) # + labs(title = "2009 H1N1 Pandemic Influenza Infections in New England (April 2009-April 2010)")
+
+
+SEIR_pandemic_comparison_array = array(data= NA, dim=c(Time+1, Vars, TotalSim), dimnames=list(NULL, c("time", "S", "E", "I", "R", "E_SE", "I_EI", "R_IR", "lambda_t"), NULL))
+
+for(i in 1:100){
+  set.seed(123*i)
+   SEIR_pandemic_comparison_array[,,i] = as.matrix(SEIR_simulation_stochastic(N=3574097, S0=3574089,E0=0,I0=8,RN=1.46, pD=2, D=6,Time=365))
+}
+
+SEIR_pandemic_comparison_summary <- data.frame(time=0:Time,
+                                  I_lower=NA,
+                                  I_median=NA,
+                                  I_upper=NA)
+for (i in 1:(Time+1)){
+  ## Columns 2:4 (2,3,4) correspond to I.
+  SEIR_pandemic_comparison_summary[i,2:4] <- quantile(SEIR_pandemic_comparison_array[i,4,], probs=c(0.05, 0.5, 0.95))
+ 
+}
+
+#DATA PLOT FOR MODEL AT A COMPARABLE SCALE
+compare_model_scaled = ggplot(SEIR_pandemic_comparison_summary, aes(x=time)) + geom_point(aes(y=I_median, col="Infected"), data= subset(SEIR_pandemic_comparison_summary, time %% 7 ==1))+
+  geom_line(aes(y = I_median, col="Infected")) +  labs( x="Time (Days)", y = "Count", color = "Legend") + scale_color_manual(values = colors) + ylim(0,1000) #+ labs(title = "Pandemic Influenza Stochastic Model (I0=8)")
+
+# arrange graphs together + figure legend
+comparedata_arrange = ggarrange(CDC_influenza_plot + labs(col=""),compare_model_scaled + labs(col="", y="# of infections"), labels ="AUTO", vjust =1.2, ncol =1)
+
+comparedata_text = paste("Figure 4. Comparison of the number of infections in the 2009 H1N1 influenza outbreak","\n","from April 2009-April 2010 (A) and the number of infections in the SEIR stochastic model for H1N1 \n pandemic influenza (B). Stochastic plot represents the average infection count of 100 model iterations \nwith a 90% Monte Carlo confidence interval ribbon.")
+
+annotate_figure(comparedata_arrange, bottom = text_grob(comparedata_text, just="left",size = 10, hjust =0, x=unit(5.5,"pt"), family = "Helvetica") )
+
+
+```
+
+# Discussion
+
+## Results and Conclusions
+
+In our results for our deterministic simulations of seasonal influenza
+(Figure 1A), we can see that the numbers of susceptible and removed
+individuals level out to about the same portion of the population. We
+can also see that exposed and infected individuals return to a value of
+zero after a small, quick rise in infections and exposures that lowers
+along with numbers of susceptible individuals lowering and leveling out
+and the numbers of removed individuals rising and leveling out, meaning
+no new infections are observed. In the stochastic models of the same
+form of influenza, seasonal influenza (Figure 2A), the pattern is very
+similar to that seen of the mean outcome in the deterministic model.
+With our narrow Monte Carlo interval, we can say with 90% confidence
+that the results will be close to what we observed in the pattern of the
+stochastic model plot.
+
+In our results for our deterministic simulations of pandemic influenza
+(Figure 1B), we can see that the numbers of removed individuals rise
+above the number of susceptible individuals as the susceptible
+individuals decrease, with both flattening out, meaning no new
+infections are observed, at the same point around day 170 once
+infections and exposures return to a value of zero. We also observe a
+small, quick rise in infections and exposures that then dwindles as the
+removed numbers rise and level out and the susceptible individuals
+decrease and level out. In the stochastic models of the same form of
+influenza, pandemic influenza (Figure 2B). the pattern is very similar
+to that seen in the mean outcome of the deterministic model, with a
+small Monte Carlo interval, meaning with 90% confidence, we can say that
+the results will be close to what we observed in the pattern of the
+stochastic model plot.
+
+Between the pandemic model and the seasonal model, a greater number of
+the population is removed in the pandemic model and a greater amount of
+individuals in the population remain susceptible in the seasonal model
+(Figures 1, 2). Additionally, we see an earlier increase, as well as a
+steeper increase, in infections in pandemic influenza, with its
+beginning occurring around 90 days in in pandemic influenza and 100 days
+in in seasonal influenza. Additionally, pandemic influenza reaches a
+point of equal susceptible and removed individuals, earlier into the
+season, meaning more have contracted the virus earlier on, with this
+occurring in pandemic influenza at about 140 days and in seasonal
+influenza at about 385 days (Figures 1, 2). This all makes sense in the
+context of our comparison between seasonal and pandemic models, since
+their traits are similar aside from the reproductive number, which is,
+on average, 1.28 in seasonal influenza and 1.46 in pandemic influenza
+(Biggerstaff et al., 2014). The higher reproductive number could
+contribute to the patterns we see in infection. Since the reproductive
+number is higher in pandemic influenza, each person who contracts
+pandemic influenza can spread the disease to more people in a shorter
+period of time, and those people can in turn, which may explain the
+earlier and higher peak in infections for pandemic influenza.
+
+When looking solely at pandemic influenza, we can observe small
+differences in infection patterns within the ranges of infectious period
+that we simulated in our pandemic influenza disease dynamic stochastic
+simulations. As the infectious period increases from 5, to 6, to 7 days,
+the point where the infections individual numbers increase moves further
+into the time we are observing, from about 110 days for a five-day
+infectious period (Figure 3A), to around 130 days for a six-day
+infectious period (Figure 3B), to around 140 days for a seven-day
+infectious period (Figure 3C). Additionally, the point where susceptible
+and removed numbers are the same and the point where the two level out
+(with no new infections) are moved further down the timeline with
+greater infectious periods. The point where removed and susceptible
+individual numbers are the same is around day 125 for a five-day
+infectious time period, with the two leveling out with no new infections
+around day 160 (Figure 3A). This happens later in a six-day infectious
+period, with the removed and susceptible numbers being the same around
+145 days in and leveling out around day 220 (Figure 3B). In a seven-day
+infectious period, it is even later, with the removed and susceptible
+numbers being the same around 160 days in and leveling out around day
+240 (Figure 3C). Additionally, the numbers of removed individuals at day
+365 are lower with a higher infectious period, and the numbers of
+susceptible individuals at day 365 are higher with a higher infectious
+period (Figure 3). Since an infectious period is the time in which an
+individual is infectious, yet the reproductive number (people who are
+infected during this period) remains the same, a longer infectious
+period would mean that the same amount of individuals are infected with
+pandemic influenza during a longer period of time. This makes a short
+infectious period more conducive to rapid spread, contributing to the
+shorter periods reaching points of equal susceptible and removed
+populations more quickly and to the infections fizzling out more
+quickly. With a shorter infectious period, influenza pandemics can run
+their courses faster.
+
+We can see a notable discrepancy between our stochastic simulation’s
+prediction of pandemic influenza infection numbers over our year-long
+period of observation and the infection numbers over this year-long time
+frame seen in our data. While data shows infection numbers in New
+England never breaching 1000 at a given time, with two small peaks over
+750 a bit past the 50 day mark and a bit past the 200 day mark, our
+simulation shows no peaks under 1000 infection cases, rising above 1000
+at around day 100 and only decreasing again a bit before day 350, with
+exponential increase up to day 100 and decrease after day 350 (Figure
+4). This is a drastic difference between our model’s prediction and the
+actual data, which may be influenced by multiple factors not
+incorporated into our modeling.
+
+The models that we were using to simulate our data in this project
+assumed homogeneous mixing. However, this assumption would not be
+reasonable, since many individuals who contracted both pandemic and
+seasonal influenza would stay home due to their symptoms instead of
+mingling with the general population, preventing further uniform spread
+throughout the population. Additionally, even if the infected
+individuals went into the general population, there would still not be
+homogeneous mixing. Not every person will infect 1.46 people, especially
+if they take caution to avoid contact with others, and not everyone
+interacts with the same amount of people in a given day, meaning
+homogeneous mixing is unrealistic to expect. Our model also did not take
+into account vaccination. Vaccination effectiveness in Influenza A was
+found to be greater than 0 for at least 6 months in Influenza A(H1N1)
+and Influenza B, and for at least five months in Influenza A(H3N2)
+(Ferdinands et al., 2017). Because of this, there was immunity in the
+population, meaning the susceptible compartment was likely far smaller
+than our model conveyed and the numbers of infected individuals in our
+model were subsequently overestimated.
+
+```{r}
+#arrange graphs together + figure legend
+text = paste("Figure 5. Summary of the deterministic SEIR models and stochastic SEIR models created for seasonal and H1N1 \npandemic influenza (A = Seasonal Deterministic, B = Pandemic Deterministic, C = Seasonal Stochastic,\nD= Pandemic Stochastic). Both models show the average course of a hypothetical influenza outbreak in \nseasonal and pandemic conditions. Deterministic plots represent static outputs for the given parameters. Stochastic plots \nrepresent average compartmental count of 100 model iterations with a 90% Monte Carlo confidence \ninterval ribbon.")
+
+legend = get_legend(seasonal_stochastic_plot)
+
+n1 = ggarrange(seasonal_stochastic_plot + labs(title = "")+ theme(legend.position = "none"), pandemic_stochastic_plot + labs(title ="", color ="")+ theme(legend.position = "none"), legend , labels = c("A","B"), nrow = 1, ncol =3)
+
+n2 = n = ggarrange(seasonal_determ_plot + labs(title = "")+ theme(legend.position = "none"), pandemic_determ_plot + labs(title ="", color ="")+ theme(legend.position = "none"), legend , labels = c("C","D"),nrow = 1, ncol =3)
+
+n = ggarrange(n1,n2, nrow = 2)
+
+annotate_figure(n, bottom = text_grob(text, just="left",size = 10, hjust =0, x=unit(5.5,"pt"), family = "Helvetica") )
+
+
+```
+
+## Limitations
+
+Our original goal for this simulation was to examine deaths in a
+separate compartment from recovered individuals in order to examine the
+different case fatality rates of seasonal and pandemic influenza in
+younger (\<18 years old) and older (65+ years old) populations. We also
+originally intended to track differences in infection behavior between
+these young and old populations. However, our data source did not
+include in-depth infection data based on these specific age
+demographics, instead focusing more on location of laboratory reports of
+infection, so we were not able to gather numbers based on young and old
+populations' infections. Additionally, the sources in our research often
+did not go in-depth regarding age-related mortality behaviors and
+patterns. The flu also frequently remains mild enough that infected
+individuals don't need to interact with the medical system and therefore
+don't enter into the data sets we used for parameters and real-world
+comparisons. This was a key reason as to why we combined recovered and
+deceased compartments into a Removed compartment.
+
+We also did not account for vaccinations or changes in the population
+size over the span of the seasonal and pandemic influenza timelines in
+this model, leading to numbers that varied from the infection numbers
+that were present in the data set that we used that referred to
+infections from the actual pandemic influenza season. Human behavior,
+such as quarantines, socialization and travel, also likely played a role
+in the real world as there are two visible and significant spikes in
+real world infections during the outbreak. As this behavior is very
+difficult to numerically quantify in an applicable manner, it would not
+be practical to incorporate this into our model
+
+# References
+
+Biggerstaff, M., Cauchemez, S., Reed, C., Gambhir, M., & Finelli, L.
+(2014). Estimates of the reproduction number for seasonal, pandemic, and
+Zoonotic Influenza: A systematic review of the literature. BMC
+Infectious Diseases, 14(1). <https://doi.org/10.1186/1471-2334-14-480>
+
+Centers for Disease Control and Prevention. (2024a). Key facts about
+influenza (flu). Centers for Disease Control and Prevention.
+<https://www.cdc.gov/flu/about/keyfacts.htm#>:\~:text=activity%20that%20season.-,Period%20of%20Contagiousness,for%20longer%20periods%20of%20time.
+
+Centers for Disease Control and Prevention. (2024b). National, regional,
+and state level outpatient illness and viral surveillance. Centers for
+Disease Control and Prevention.
+<https://gis.cdc.gov/grasp/fluview/fluportaldashboard.html>
+
+Clinical aspects of pandemic 2009 Influenza A (H1N1) virus infection.
+(2010) New England Journal of Medicine. 362(18). 1708-1719.
+10.1056/NEJMra1000449
+
+Ferdinands, J. M., Fry, A. M., Reynolds, S., Petrie, J., Flannery, B.,
+Jackson, M. L., & Belongia, E. A. (2016). Intraseason waning of
+influenza vaccine protection: Evidence from the US influenza vaccine
+effectiveness network, 2011-12 through 2014-15. Clinical Infectious
+Diseases. <https://doi.org/10.1093/cid/ciw816>
+
+Petrie, J. G., Ohmit, S. E., Truscon, R., Johnson, E., Braun, T. M.,
+Levine, M. Z., Eichelberger, M. C., & Monto, A. S. (2016). Modest waning
+of influenza vaccine efficacy and antibody titers during the 2007–2008
+influenza season. Journal of Infectious Diseases, 214(8), 1142–1149.
+<https://doi.org/10.1093/infdis/jiw105>
+
+Taubenberger, J. K., Morens, D. M. (2008). The Pathology of Influenza
+Virus Infections. Annual Review of Pathology: Mechanisms of Disease,
+3(1), 499-522.
+<https://doi.org/10.1146/annurev.pathmechdis.3.121806.154316>
+
+U.S. Census Bureau. (2012, June). 2010 Census of population and housing.
+<https://www2.census.gov/prod2/cen2010/cph-1-8.pdf>
+
+World Health Organization. (2023, October 3). Influenza (seasonal).
+World Health Organization.
+[https://www.who.int/news-room/fact-sheets/detail/influenza-(seasonal)](https://www.who.int/news-room/fact-sheets/detail/influenza-(seasonal)){.uri}
+
+## R Packages Used
+
+Disabato, D.(2023). str2str: Convert R Objects from One Structure to
+Another. R package version 1.0.0,
+<https://CRAN.R-project.org/package=str2str>
+
+Kassambara, A. (2023). ggpubr: ‘ggplot2’ Based Publication Ready Plots.
+R package version 0.6.0, <https://CRAN.R-project.org/package=ggpubr>
+
+Wickham, H. (2016). ggplot2: Elegant Graphics for Data Analysis.
+<https://ggplot2.tidyverse.org>
